@@ -1,0 +1,36 @@
+name: Deploy to WordPress.org
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  deploy:
+    name: Publish the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the versions agree
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          header=$(sed -n 's/^ \* Version: *//p' unicode-email-addresses.php)
+          stable=$(sed -n 's/^Stable tag: *//p' readme.txt)
+          echo "tag=$tag header=$header stable=$stable"
+          test "$tag" = "$header" || { echo "The plugin header says $header."; exit 1; }
+          test "$tag" = "$stable" || { echo "Stable tag says $stable."; exit 1; }
+
+      - name: Deploy
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        with:
+          generate-zip: true
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: unicode-email-addresses
+
+      - name: Attach the zip to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ github.workspace }}/unicode-email-addresses.zip
